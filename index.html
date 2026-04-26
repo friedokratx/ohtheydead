@@ -514,24 +514,44 @@
   let audioCtx = null;
 
   // Real audio files: The Price is Right losing horns + winning fanfare
-  // Hosted on the Internet Archive (long-term reliable, CORS-friendly)
   const SAD_TROMBONE_URL = 'https://archive.org/download/tvtunes_31123/The%20Price%20is%20Right%20-%20Losing%20Horn.mp3';
   const BELL_URL = 'https://archive.org/download/tvtunes_31243/The%20Price%20is%20Right%20-%20Come%20on%20Down.mp3';
 
-  // Backup CDN (Myinstants) in case archive.org is slow
+  // Backup URLs in case primary fails (Myinstants is widely CORS-friendly)
   const SAD_TROMBONE_BACKUP = 'https://www.myinstants.com/media/sounds/the-price-is-right-losing-horn.mp3';
-  const BELL_BACKUP = 'https://www.myinstants.com/media/sounds/come-on-down.mp3';
+  const BELL_BACKUP = 'https://www.myinstants.com/media/sounds/come-on-down_2.mp3';
 
   // Pre-load audio elements
   const sadTromboneAudio = new Audio(SAD_TROMBONE_URL);
   sadTromboneAudio.preload = 'auto';
   sadTromboneAudio.volume = 0.6;
-  sadTromboneAudio.crossOrigin = 'anonymous';
 
   const bellAudio = new Audio(BELL_URL);
   bellAudio.preload = 'auto';
-  bellAudio.volume = 0.5;
-  bellAudio.crossOrigin = 'anonymous';
+  bellAudio.volume = 0.7;
+
+  // Track loading state — if primary fails, swap to backup automatically on load
+  let bellReady = false;
+  let tromboneReady = false;
+
+  bellAudio.addEventListener('canplaythrough', () => { bellReady = true; });
+  sadTromboneAudio.addEventListener('canplaythrough', () => { tromboneReady = true; });
+
+  // If primary URL fails to load, switch source to backup
+  bellAudio.addEventListener('error', () => {
+    console.warn('Bell primary failed, switching to backup');
+    if (bellAudio.src !== BELL_BACKUP) {
+      bellAudio.src = BELL_BACKUP;
+      bellAudio.load();
+    }
+  });
+  sadTromboneAudio.addEventListener('error', () => {
+    console.warn('Trombone primary failed, switching to backup');
+    if (sadTromboneAudio.src !== SAD_TROMBONE_BACKUP) {
+      sadTromboneAudio.src = SAD_TROMBONE_BACKUP;
+      sadTromboneAudio.load();
+    }
+  });
 
   const soundToggle = document.getElementById('soundToggle');
   soundToggle.addEventListener('click', () => {

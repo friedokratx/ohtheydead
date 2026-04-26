@@ -514,12 +514,9 @@
   let audioCtx = null;
 
   // Real audio files: The Price is Right losing horns + winning fanfare
+  // Hosted on the Internet Archive (CORS-friendly, reliable long-term)
   const SAD_TROMBONE_URL = 'https://archive.org/download/tvtunes_31123/The%20Price%20is%20Right%20-%20Losing%20Horn.mp3';
   const BELL_URL = 'https://archive.org/download/tvtunes_31243/The%20Price%20is%20Right%20-%20Come%20on%20Down.mp3';
-
-  // Backup URLs in case primary fails (Myinstants is widely CORS-friendly)
-  const SAD_TROMBONE_BACKUP = 'https://www.myinstants.com/media/sounds/the-price-is-right-losing-horn.mp3';
-  const BELL_BACKUP = 'https://www.myinstants.com/media/sounds/come-on-down_2.mp3';
 
   // Pre-load audio elements
   const sadTromboneAudio = new Audio(SAD_TROMBONE_URL);
@@ -530,27 +527,12 @@
   bellAudio.preload = 'auto';
   bellAudio.volume = 0.7;
 
-  // Track loading state — if primary fails, swap to backup automatically on load
-  let bellReady = false;
-  let tromboneReady = false;
-
-  bellAudio.addEventListener('canplaythrough', () => { bellReady = true; });
-  sadTromboneAudio.addEventListener('canplaythrough', () => { tromboneReady = true; });
-
-  // If primary URL fails to load, switch source to backup
-  bellAudio.addEventListener('error', () => {
-    console.warn('Bell primary failed, switching to backup');
-    if (bellAudio.src !== BELL_BACKUP) {
-      bellAudio.src = BELL_BACKUP;
-      bellAudio.load();
-    }
+  // Log any audio loading errors to console for diagnostics
+  bellAudio.addEventListener('error', (e) => {
+    console.warn('Bell audio failed to load:', BELL_URL, bellAudio.error);
   });
-  sadTromboneAudio.addEventListener('error', () => {
-    console.warn('Trombone primary failed, switching to backup');
-    if (sadTromboneAudio.src !== SAD_TROMBONE_BACKUP) {
-      sadTromboneAudio.src = SAD_TROMBONE_BACKUP;
-      sadTromboneAudio.load();
-    }
+  sadTromboneAudio.addEventListener('error', (e) => {
+    console.warn('Sad trombone audio failed to load:', SAD_TROMBONE_URL, sadTromboneAudio.error);
   });
 
   const soundToggle = document.getElementById('soundToggle');
@@ -569,21 +551,16 @@
     return audioCtx;
   }
 
-  // Play primary audio, fall back to backup URL, then to synth
-  function playAudio(audioEl, backupUrl, fallbackFn) {
+  // Play primary audio, fall back to synth if it fails
+  function playAudio(audioEl, fallbackFn) {
     if (!soundEnabled) return;
     try {
       audioEl.currentTime = 0;
       const playPromise = audioEl.play();
       if (playPromise && typeof playPromise.catch === 'function') {
-        playPromise.catch(() => {
-          // Primary failed — try backup URL
-          if (backupUrl && audioEl.src !== backupUrl) {
-            audioEl.src = backupUrl;
-            audioEl.play().catch(() => fallbackFn && fallbackFn());
-          } else if (fallbackFn) {
-            fallbackFn();
-          }
+        playPromise.catch((err) => {
+          console.warn('Audio playback failed, using synth fallback:', err);
+          if (fallbackFn) fallbackFn();
         });
       }
     } catch(e) {
@@ -646,8 +623,8 @@
     osc.stop(now + noteDur*3 + finalDur + 0.1);
   }
 
-  function playBell() { playAudio(bellAudio, BELL_BACKUP, synthBell); }
-  function playSadTrombone() { playAudio(sadTromboneAudio, SAD_TROMBONE_BACKUP, synthSadTrombone); }
+  function playBell() { playAudio(bellAudio, synthBell); }
+  function playSadTrombone() { playAudio(sadTromboneAudio, synthSadTrombone); }
   // ==========================================
   // ==========================================
 
